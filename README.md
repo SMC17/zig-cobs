@@ -99,6 +99,11 @@ pub const Error = error{
 zig build test
 ```
 
+21 tests. Fuzz and property tests now cover round-trip across every documented
+size × content-pattern corner plus 10k random adversarial payloads, and exercise
+the decoder against random bytes and single-bit-flipped frames to confirm it
+never panics.
+
 Includes:
 
 - Boundary cases at empty input, single-zero, single-non-zero, 254-byte runs
@@ -108,6 +113,16 @@ Includes:
 - Malformed-frame rejection (zero byte mid-frame, truncated frame).
 - Property-based roundtrip across lengths 0–2048 with pseudo-random payloads.
 - Property-based check that `encode` output is always `≤ maxEncodedLength`.
+- Property-based round-trip across the size × content-pattern matrix
+  (`{0, 1, 2, 7, 8, 254, 255, 256, 512, 1024}` × seven patterns including
+  all-zero, no-zero, alternating, single-zero placements, and the 254-byte
+  worst-case-overhead run).
+- Property-based encoded-form invariants across the same matrix.
+- Fuzz: 10,000 random-length, random-content round-trips.
+- Fuzz: 10,000 random byte sequences fed to `decode` to confirm it never
+  panics on garbage input.
+- Fuzz: exhaustive single-bit-flip mutations of canonical encoded frames,
+  asserting `decode` only ever returns or errors — never crashes.
 
 ## Use cases
 
