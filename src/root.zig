@@ -253,3 +253,235 @@ test "encode size matches maxEncodedLength upper bound" {
         try testing.expect(enc_len <= maxEncodedLength(len));
     }
 }
+
+// ---- property-based & fuzz tests ----
+//
+// These tests close the "no fuzz/property testing" gap flagged by external
+// review. They exhaustively walk size × content-pattern matrices, drive the
+// codec with 10k random adversarial inputs, and exercise the decoder against
+// random bytes and bit-flipped frames to confirm it never panics.
+
+/// Fill `dst` with one of the canonical content patterns used by the property
+/// tests. Patterns enumerate the corners of COBS' behaviour: pure-zero runs,
+/// pure-non-zero runs (worst-case overhead), alternating zeros, and a single
+/// zero placed at each of the structurally significant positions.
+fn fillPattern(dst: []u8, pattern: u8) void {
+    switch (pattern) {
+        // all-zero
+        0 => @memset(dst, 0),
+        // no-zero (all 0xAA)
+        1 => @memset(dst, 0xAA),
+        // alternating 0x00 0xFF 0x00 0xFF ...
+        2 => for (dst, 0..) |*b, i| {
+            b.* = if (i % 2 == 0) 0 else 0xFF;
+        },
+        // single zero at start
+        3 => {
+            @memset(dst, 0xAA);
+            if (dst.len > 0) dst[0] = 0;
+        },
+        // single zero at end
+        4 => {
+            @memset(dst, 0xAA);
+            if (dst.len > 0) dst[dst.len - 1] = 0;
+        },
+        // single zero at middle
+        5 => {
+            @memset(dst, 0xAA);
+            if (dst.len > 0) dst[dst.len / 2] = 0;
+        },
+        // 254-byte non-zero run hugging the worst-case overhead boundary
+        6 => for (dst, 0..) |*b, i| {
+            b.* = @intCast((i % 254) + 1);
+        },
+        else => unreachable,
+    }
+}
+
+test "property: round-trip across size × content-pattern matrix" {
+    const sizes = [_]usize{ 0, 1, 2, 7, 8, 254, 255, 256, 512, 1024 };
+    const num_patterns: u8 = 7;
+
+    var src_buf: [1024]u8 = undefined;
+    var enc_buf: [maxEncodedLength(1024)]u8 = undefined;
+    var dec_buf: [1024]u8 = undefined;
+
+    for (sizes) |len| {
+        var pattern: u8 = 0;
+        while (pattern < num_patterns) : (pattern += 1) {
+            const src = src_buf[0..len];
+            fillPattern(src, pattern);
+
+            const enc_len = try encode(src, &enc_buf);
+            const dec_len = try decode(enc_buf[0..enc_len], &dec_buf);
+
+            try testing.expectEqual(len, dec_len);
+            try testing.expectEqualSlices(u8, src, dec_buf[0..dec_len]);
+        }
+    }
+}
+
+test "property: encoded-form invariants across size × content-pattern matrix" {
+    // This implementation emits the canonical COBS body WITHOUT the trailing
+    // 0x00 frame delimiter (callers append it themselves when streaming). So
+    // the invariant we check here is the stronger form: the encoded output
+    // contains zero 0x00 bytes anywhere, and its length never exceeds the
+    // documented worst-case bound `maxEncodedLength(input.len)`.
+    const sizes = [_]usize{ 0, 1, 2, 7, 8, 254, 255, 256, 512, 1024 };
+    const num_patterns: u8 = 7;
+
+    var src_buf: [1024]u8 = undefined;
+    var enc_buf: [maxEncodedLength(1024)]u8 = undefined;
+
+    for (sizes) |len| {
+        var pattern: u8 = 0;
+        while (pattern < num_patterns) : (pattern += 1) {
+            const src = src_buf[0..len];
+            fillPattern(src, pattern);
+
+            const enc_len = try encode(src, &enc_buf);
+
+            // Length never exceeds the documented bound.
+            try testing.expect(enc_len <= maxEncodedLength(len));
+            // Empty input still produces the canonical single-byte 0x01 frame.
+            try testing.expect(enc_len >= 1);
+
+            // No zero bytes anywhere in the encoded body — the entire point
+            // of COBS. A 0x00 here would alias the frame delimiter.
+            for (enc_buf[0..enc_len]) |b| {
+                try testing.expect(b != 0);
+            }
+        }
+    }
+}
+
+test "fuzz: 10k random round-trips" {
+    var rng = std.Random.DefaultPrng.init(0xF0F0_1234);
+    const random = rng.random();
+
+    var src_buf: [1024]u8 = undefined;
+    var enc_buf: [maxEncodedLength(1024)]u8 = undefined;
+    var dec_buf: [1024]u8 = undefined;
+
+    var iter: usize = 0;
+    while (iter < 10_000) : (iter += 1) {
+        const len = random.intRangeAtMost(usize, 0, 1024);
+        const src = src_buf[0..len];
+        random.bytes(src);
+
+        const enc_len = try encode(src, &enc_buf);
+
+        // Round-trip equality.
+        const dec_len = try decode(enc_buf[0..enc_len], &dec_buf);
+        try testing.expectEqual(len, dec_len);
+        try testing.expectEqualSlices(u8, src, dec_buf[0..dec_len]);
+
+        // Sensible zero-density relationship: more zeros in the input pushes
+        // the encoding closer to the worst-case bound, but the encoded length
+        // must always stay between (input_len + 1) -- the minimum where every
+        // byte fits in a single run -- and maxEncodedLength.
+        try testing.expect(enc_len <= maxEncodedLength(len));
+        try testing.expect(enc_len >= @max(@as(usize, 1), len));
+
+        // Count zeros to make the relationship explicit; an input of all
+        // zeros must hit (len + 1) exactly because each zero terminates a
+        // run of length 1.
+        var zero_count: usize = 0;
+        for (src) |b| {
+            if (b == 0) zero_count += 1;
+        }
+        if (zero_count == len and len > 0) {
+            try testing.expectEqual(len + 1, enc_len);
+        }
+    }
+}
+
+test "fuzz: decode of garbage never panics (10k iterations)" {
+    var rng = std.Random.DefaultPrng.init(0xDEAD_BEEF);
+    const random = rng.random();
+
+    var src_buf: [1100]u8 = undefined;
+    var dec_buf: [1100]u8 = undefined;
+
+    var iter: usize = 0;
+    while (iter < 10_000) : (iter += 1) {
+        const len = random.intRangeAtMost(usize, 0, 1100);
+        const src = src_buf[0..len];
+        random.bytes(src);
+
+        // Decode is allowed to return a payload or an error. The only
+        // unacceptable outcome is a panic / undefined behaviour, which would
+        // crash the test runner before this line completes.
+        if (decode(src, &dec_buf)) |n| {
+            try testing.expect(n <= dec_buf.len);
+        } else |_| {
+            // Whatever error the decoder returned is fine; we just need a
+            // well-defined outcome.
+        }
+    }
+}
+
+test "fuzz: single-bit-flip detection never panics decode" {
+    // Canonical fixtures: a string with an embedded zero, and a 100-byte
+    // pseudo-random payload. For each, encode, then for every bit position
+    // in the encoded output flip exactly that bit and run decode. Either
+    // decode returns an error or it returns some payload — the only failure
+    // mode the test rejects is a panic.
+    const fixtures = [_][]const u8{
+        "Hello\x00World",
+        // Repeated to exercise multi-block COBS encoding too.
+        "The quick brown fox\x00jumps over\x00the lazy dog",
+    };
+
+    var enc_buf: [maxEncodedLength(256)]u8 = undefined;
+    var flipped_buf: [maxEncodedLength(256)]u8 = undefined;
+    var dec_buf: [256]u8 = undefined;
+
+    for (fixtures) |src| {
+        const enc_len = try encode(src, &enc_buf);
+
+        var byte_idx: usize = 0;
+        while (byte_idx < enc_len) : (byte_idx += 1) {
+            var bit_idx: u3 = 0;
+            while (true) {
+                @memcpy(flipped_buf[0..enc_len], enc_buf[0..enc_len]);
+                flipped_buf[byte_idx] ^= (@as(u8, 1) << bit_idx);
+
+                if (decode(flipped_buf[0..enc_len], &dec_buf)) |_| {
+                    // decode succeeded — that is fine, the output may equal
+                    // or differ from `src`. Robustness is the property under
+                    // test, not error detection.
+                } else |_| {
+                    // an error is equally acceptable.
+                }
+
+                if (bit_idx == 7) break;
+                bit_idx += 1;
+            }
+        }
+    }
+
+    // Also fuzz against a 100-byte random payload to broaden coverage.
+    var rng = std.Random.DefaultPrng.init(0xBADC0DE);
+    var rand_src: [100]u8 = undefined;
+    rng.random().bytes(&rand_src);
+    const enc_len = try encode(&rand_src, &enc_buf);
+
+    var byte_idx: usize = 0;
+    while (byte_idx < enc_len) : (byte_idx += 1) {
+        var bit_idx: u3 = 0;
+        while (true) {
+            @memcpy(flipped_buf[0..enc_len], enc_buf[0..enc_len]);
+            flipped_buf[byte_idx] ^= (@as(u8, 1) << bit_idx);
+
+            if (decode(flipped_buf[0..enc_len], &dec_buf)) |_| {
+                // ok
+            } else |_| {
+                // an error is equally acceptable.
+            }
+
+            if (bit_idx == 7) break;
+            bit_idx += 1;
+        }
+    }
+}
