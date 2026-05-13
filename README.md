@@ -29,7 +29,7 @@ Add `zig-cobs` to your `build.zig.zon` dependencies:
 ```zig
 .dependencies = .{
     .cobs = .{
-        .url = "https://example.invalid/zig-cobs-v0.1.0.tar.gz",
+        .url = "https://github.com/SMC17/zig-cobs/archive/refs/tags/v0.1.0.tar.gz",
         .hash = "...",
     },
 },
