@@ -132,3 +132,13 @@ MIT. See `LICENSE`.
 Issues and PRs welcome. The code surface is intentionally small; changes
 should preserve zero-allocation, freestanding-friendly, and `O(n)` time
 properties.
+
+## Part of the Sovereign Stack
+
+This is one of a set of small, composable Zig libraries.
+
+- [**zig-frame-protocol**](https://github.com/SMC17/zig-frame-protocol) — versioned binary frame protocol that uses `zig-cobs` for framing
+- [**zig-graph**](https://github.com/SMC17/zig-graph) — sparse undirected graph + spectral algorithms
+- [**zig-h3**](https://github.com/SMC17/zig-h3) — H3 v4 spatial index, pure-Zig + libh3 wrapper
+
+See [github.com/SMC17](https://github.com/SMC17) for the full portfolio.
