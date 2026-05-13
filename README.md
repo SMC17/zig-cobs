@@ -138,6 +138,47 @@ the library usable on `freestanding` targets, in interrupt handlers, and in
 contexts where allocator failure is not an option. Compute the required buffer
 size with `maxEncodedLength` at the call site.
 
+## Benchmarks
+
+```sh
+zig build bench
+```
+
+Three benchmarks ship under `bench/`:
+
+- `bench_encode.zig` — encode throughput at 16 B / 256 B / 1 KiB / 64 KiB
+- `bench_decode.zig` — decode throughput at the same matrix
+- `bench_worst_case.zig` — 254-byte all-non-zero pattern (the boundary that
+  triggers the COBS overhead-byte injection on every run; useful for spotting
+  cliffs in the overhead-refresh path)
+
+Each benchmark warms up for 1 000 iterations, then measures with enough
+iterations (5 M for 16 B, scaled down for larger sizes) to dampen variance
+across roughly one second of wall time. Output is parseable
+`key=value` lines so external collectors can scrape them. Timing uses
+`std.os.linux.clock_gettime(.MONOTONIC, &ts)` directly — `std.time.Timer` and
+`std.time.nanoTimestamp` were removed in Zig 0.16's stdlib reshuffle.
+
+Representative numbers on the maintainer's workstation
+(Intel Core i7-1065G7 @ 1.30 GHz, Linux 7.0.3-arch1-1 x86_64, Zig 0.16.0,
+`zig build bench` with `-Doptimize=ReleaseFast`):
+
+| Bench                | Size   | ns/op   | MB/s |
+| -------------------- | ------ | ------- | ---- |
+| encode (random)      | 256 B  | 1 933   |  132 |
+| encode (random)      | 1 KiB  | 17 478  |   58 |
+| encode (random)      | 64 KiB | 410 359 |  159 |
+| decode (random)      | 256 B  | 1 391   |  183 |
+| decode (random)      | 64 KiB | 276 451 |  237 |
+| encode (worst-case)  | 254 B  | 715     |  354 |
+| decode (worst-case)  | 254 B  | 1 215   |  209 |
+
+The worst-case all-non-zero row is faster than the random-payload row because
+the inner loop has no zero-byte branch to mispredict; encode hits a
+straight-line copy with one overhead-byte refresh.
+
+These numbers are on my workstation; bring your own data.
+
 ## License
 
 MIT. See `LICENSE`.
