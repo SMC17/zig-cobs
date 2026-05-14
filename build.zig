@@ -33,6 +33,40 @@ pub fn build(b: *std.Build) void {
     const example_step = b.step("example-roundtrip", "Run the roundtrip example");
     example_step.dependOn(&run_example.step);
 
+    // Fuzz harness — three-property check (round-trip, zero-freeness,
+    // decoder-soundness on adversarial inputs). The full pass runs
+    // 100K random + 12K boundary + 5K adversarial trials.
+    //
+    // CI runs the smaller fuzz-as-test variant via `zig build test`
+    // (1.2K boundary + 1K random + 200 adversarial); the full pass
+    // is `zig build fuzz` and is run pre-release.
+    const fuzz_mod = b.createModule(.{
+        .root_source_file = b.path("tests/fuzz.zig"),
+        .target = target,
+        .optimize = .ReleaseFast,
+    });
+    fuzz_mod.addImport("cobs", mod);
+    const fuzz_exe = b.addExecutable(.{
+        .name = "fuzz",
+        .root_module = fuzz_mod,
+    });
+    const run_fuzz = b.addRunArtifact(fuzz_exe);
+    if (b.args) |args| run_fuzz.addArgs(args);
+    run_fuzz.has_side_effects = true;
+    const fuzz_step = b.step("fuzz", "Run the full fuzz harness (~120K trials, ReleaseFast)");
+    fuzz_step.dependOn(&run_fuzz.step);
+
+    // CI-friendly fuzz subset wired into `zig build test`
+    const fuzz_test_mod = b.createModule(.{
+        .root_source_file = b.path("tests/fuzz.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    fuzz_test_mod.addImport("cobs", mod);
+    const fuzz_tests = b.addTest(.{ .root_module = fuzz_test_mod });
+    const run_fuzz_tests = b.addRunArtifact(fuzz_tests);
+    test_step.dependOn(&run_fuzz_tests.step);
+
     // Benchmarks — separate step (`zig build bench`) so `zig build test`
     // stays fast. Always built in ReleaseFast so numbers reflect optimised
     // codegen regardless of the user's top-level optimize flag.
