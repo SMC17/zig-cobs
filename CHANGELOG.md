@@ -1,4 +1,33 @@
-## v1.0.0 — 2026-05-13
+# Changelog
+
+All notable changes to `zig-cobs` are documented in this file.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and the project adheres to [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+## [1.1.0] — 2026-05-14
+
+First post-hygiene-v1.0 feature release. Adds a substantive fuzz harness.
+
+### Added
+
+- `tests/fuzz.zig` — three-property fuzz harness asserting against arbitrary byte inputs:
+  1. **Round-trip invariance:** `decode(encode(x)) == x` for all `x`.
+  2. **Zero-freeness:** `encode` output never contains a `0x00` byte.
+  3. **Decoder soundness:** `decode` on adversarial random bytes either succeeds or returns `InvalidEncoding` / `BufferTooSmall` — never panics, never overflows the destination buffer.
+- `zig build fuzz` step (ReleaseFast): 117,000 trials (12K boundary + 100K random round-trip + 5K adversarial decoder).
+- Boundary sizes specifically exercised at 1,000 reps each: `{0, 1, 2, 253, 254, 255, 256, 508, 509, 510, 762, 4096}` — the overhead-byte injection boundary that random-PRNG-only trials would hit with low probability.
+- `zig build test` now includes a 2,400-trial CI-friendly fuzz subset.
+- CI workflow gates the full `zig build fuzz` after every push.
+
+### Verified
+
+- Linux x86_64: 117,000 trials pass, all three properties hold.
+- Apple Silicon arm64 (mac): identical 117,000 trials pass.
+
+## [1.0.0] — 2026-05-13
 
 **Production-grade hygiene milestone.**
 
@@ -6,13 +35,6 @@
 - Verified LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT, CI workflow all in place and accurate.
 - API surface declared stable for the v1.x cycle. Breaking changes will bump to v2.x.
 - Engineering posture: Virgil work-in-progress convention adapted for OSS — v1.0 means we stand behind the existing surface; v1.x patches refine implementation without breaking the API.
-
-# Changelog
-
-All notable changes to `zig-cobs` are documented in this file.
-
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.1.0] — 2026-05-13
 
