@@ -18,10 +18,13 @@ jobs:
           version: "0.16.0"
 
       - name: zig fmt --check
-        run: zig fmt --check src/ build.zig
+        run: zig fmt --check src/ build.zig tests/
 
       - name: zig build
         run: zig build
 
       - name: zig build test
         run: zig build test --summary all
+
+      - name: Full fuzz (117K trials)
+        run: zig build fuzz
