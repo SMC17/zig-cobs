@@ -1,5 +1,7 @@
 # zig-cobs
 
+[![CI](https://github.com/SMC17/zig-cobs/actions/workflows/ci.yml/badge.svg)](https://github.com/SMC17/zig-cobs/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/SMC17/zig-cobs?display_name=tag&sort=semver)](https://github.com/SMC17/zig-cobs/releases) [![License](https://img.shields.io/github/license/SMC17/zig-cobs)](LICENSE)
+
 Consistent Overhead Byte Stuffing (COBS) framing in pure Zig. Zero allocation,
 no dependencies, suitable for embedded targets and high-throughput stream
 framing on hosts.
@@ -15,12 +17,20 @@ Reference: Cheshire & Baker, [Consistent Overhead Byte Stuffing][cobs-paper]
 
 ## Status
 
-`v0.1.0` — initial release. Encode and decode are correct against the
-reference algorithm and pass property-based roundtrip tests across lengths
-0 through 2048 with pseudo-random payloads, plus boundary cases at the 254
-and 255 byte overhead breakpoints.
+`v1.0.0` — stable API. The public surface (`encode`, `decode`,
+`maxEncodedLength`, two error variants) is locked: breaking changes will
+be v2.0. 21 tests cover:
 
-Minimum Zig version: `0.15.0`. Tested on Zig `0.16.0`.
+- Round-trip correctness across the size × content-pattern matrix (every documented edge case)
+- Encoded-form invariants (no `0x00` bytes in any encoded body, length ≤ `maxEncodedLength`)
+- 10,000-iteration random round-trip fuzz
+- 10,000-iteration garbage-decode never-panic robustness
+- Exhaustive single-bit-flip mutation of canonical encoded frames (decode either errors or returns — never crashes)
+
+Production-grade benchmarks shipped (`zig build bench`). Zero allocation,
+no third-party dependencies, freestanding-friendly.
+
+Minimum Zig version: `0.16.0`.
 
 ## Install
 
@@ -29,7 +39,7 @@ Add `zig-cobs` to your `build.zig.zon` dependencies:
 ```zig
 .dependencies = .{
     .cobs = .{
-        .url = "https://github.com/SMC17/zig-cobs/archive/refs/tags/v0.1.0.tar.gz",
+        .url = "https://github.com/SMC17/zig-cobs/archive/refs/tags/v1.0.0.tar.gz",
         .hash = "...",
     },
 },
