@@ -67,6 +67,33 @@ pub fn build(b: *std.Build) void {
     const run_fuzz_tests = b.addRunArtifact(fuzz_tests);
     test_step.dependOn(&run_fuzz_tests.step);
 
+    // Differential conformance — cross-checks Zig encoder/decoder against an
+    // independent C reference written from the Cheshire/Baker 1997 paper
+    // (`tests/c_ref/cobs_ref.h`) plus the canonical paper test vectors
+    // (Table 1, IEEE/ACM ToN 1999). Moves the proof level from
+    // self-consistent fuzz (Zig vs Zig) to differential (Zig vs C +
+    // published ground truth).
+    const diff_mod = b.createModule(.{
+        .root_source_file = b.path("tests/differential.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    diff_mod.addImport("cobs", mod);
+    diff_mod.addIncludePath(b.path("tests/c_ref"));
+    diff_mod.addCSourceFile(.{
+        .file = b.path("tests/c_ref/cobs_ref.c"),
+        .flags = &.{ "-std=c11", "-Wall", "-Wextra", "-Werror", "-O2" },
+    });
+    const diff_exe = b.addExecutable(.{
+        .name = "differential",
+        .root_module = diff_mod,
+    });
+    const run_diff = b.addRunArtifact(diff_exe);
+    run_diff.has_side_effects = true;
+    const diff_step = b.step("differential", "Run differential conformance test (Zig vs C reference + paper vectors)");
+    diff_step.dependOn(&run_diff.step);
+
     // Benchmarks — separate step (`zig build bench`) so `zig build test`
     // stays fast. Always built in ReleaseFast so numbers reflect optimised
     // codegen regardless of the user's top-level optimize flag.
