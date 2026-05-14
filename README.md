@@ -17,15 +17,17 @@ Reference: Cheshire & Baker, [Consistent Overhead Byte Stuffing][cobs-paper]
 
 ## Status
 
-`v1.0.0` — stable API. The public surface (`encode`, `decode`,
+`v1.1.0` — stable API. The public surface (`encode`, `decode`,
 `maxEncodedLength`, two error variants) is locked: breaking changes will
-be v2.0. 21 tests cover:
+be v2.0. **22 tests pass** (21 correctness/robustness + 1 fuzz harness),
+covering:
 
 - Round-trip correctness across the size × content-pattern matrix (every documented edge case)
 - Encoded-form invariants (no `0x00` bytes in any encoded body, length ≤ `maxEncodedLength`)
 - 10,000-iteration random round-trip fuzz
 - 10,000-iteration garbage-decode never-panic robustness
 - Exhaustive single-bit-flip mutation of canonical encoded frames (decode either errors or returns — never crashes)
+- **v1.1 fuzz harness**: 117,000-trial bounded-input fuzz gated in CI
 
 Production-grade benchmarks shipped (`zig build bench`). Zero allocation,
 no third-party dependencies, freestanding-friendly.
