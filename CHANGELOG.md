@@ -10,6 +10,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - `tests/differential.zig` + `tests/c_ref/` — differential conformance harness cross-checking the Zig encoder/decoder against an independent C reference (written from Cheshire & Baker 1997/1999) plus the first five canonical paper test vectors from Table 1 of the IEEE/ACM ToN 1999 writeup. `zig build differential` runs 5 paper vectors + 10,000 random trials (mixed size buckets 0..4096) + 16 boundary sizes + 32 pure-pattern inputs; all 10,053 checks pass byte-identical in both encode and cross-decode directions on Linux x86_64 / Zig 0.16.0. Scope-honest: paper vectors 6–10 are intentionally omitted because the paper's tabulated encoded form drops the phantom-block trailer that every real implementation must emit — the rationale is documented in the test source.
+- `bench/RESULTS.md` — published throughput numbers from `zig build bench -Doptimize=ReleaseFast` on a pinned hardware class (Intel Core i7-1065G7 / Linux x86_64 / Zig 0.16.0). Asymptotic encode ~340 MB/s, decode ~425 MB/s, worst-case 254-byte run encode 465 MB/s / decode 883 MB/s. Reproducer + reading notes + not-yet list pinned in the file. Closes the "throughput benchmark not chosen by the differential rip" gap.
 
 ## [1.1.0] — 2026-05-14
 
