@@ -59,6 +59,30 @@ pub fn build(b: *std.Build) void {
     const doctest_step = b.step("doctest", "Verify README code examples match the executable source + run cleanly");
     doctest_step.dependOn(&doctest.step);
 
+    // Coverage driver — a plain executable (NOT a `zig test` runner) that
+    // exercises every public API + every public error path in src/root.zig
+    // from a single binary. The Zig test runner's debug-info layout on
+    // Zig 0.16 does not currently surface line-coverage to kcov through
+    // the nixpkgs build (built without libbfd); see STATUS.md → "Coverage".
+    // A plain exe avoids that and gives kcov a clean target.
+    //
+    // Run with: `zig build install && kcov --include-pattern=root.zig
+    // coverage-out ./zig-out/bin/coverage-driver`.
+    const cov_mod = b.createModule(.{
+        .root_source_file = b.path("examples/coverage_driver.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    cov_mod.addImport("cobs", mod);
+    const cov_exe = b.addExecutable(.{
+        .name = "coverage-driver",
+        .root_module = cov_mod,
+    });
+    b.installArtifact(cov_exe);
+    const run_cov = b.addRunArtifact(cov_exe);
+    const cov_step = b.step("coverage-driver", "Run the kcov coverage driver (every public API + every error path)");
+    cov_step.dependOn(&run_cov.step);
+
     // Fuzz harness — three-property check (round-trip, zero-freeness,
     // decoder-soundness on adversarial inputs). The full pass runs
     // 100K random + 12K boundary + 5K adversarial trials.

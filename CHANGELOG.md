@@ -5,6 +5,32 @@ All notable changes to `zig-cobs` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-05-15
+
+### Added
+- **Line coverage measurement: 100% on `src/root.zig`** (48/48 lines).
+  Closes the Wave-4 fleet-wide gap "we cite test counts without naming
+  what % of code those tests actually exercise". Methodology:
+  - `examples/coverage_driver.zig` — single-binary executable that
+    exercises every public function (`encode`, `decode`,
+    `maxEncodedLength`) and every public error path (`BufferTooSmall`,
+    `InvalidEncoding`) across a deterministic input matrix.
+  - `tools/coverage.sh` — wrapper that builds the driver in Debug,
+    runs `kcov --include-pattern=root.zig` against it, prints the
+    line %, and fails if coverage drops below 80% (current floor).
+  - `.github/workflows/ci.yml` — `coverage` job that runs on every
+    push and uploads the kcov HTML report as an artifact.
+
+### Why a coverage-driver instead of `zig test`
+- The Zig 0.16 test runner's debug-info layout currently does not
+  surface line-coverage to kcov through the nixpkgs build (which is
+  compiled without libbfd-dev). A plain executable has standard
+  ELF+DWARF and kcov captures it cleanly. The driver runs the same
+  assertions as the test suite, in a form kcov can introspect.
+
+### Evidence vocabulary added
+- `coverage-measured` evidence level documented in README.
+
 ## [Unreleased]
 
 ### Honesty correction — 2026-05-15
