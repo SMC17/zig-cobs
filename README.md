@@ -32,6 +32,10 @@ covering:
 Production-grade benchmarks shipped (`zig build bench`). Zero allocation,
 no third-party dependencies, freestanding-friendly.
 
+CI covers Linux x86_64, Linux aarch64, and macOS arm64 (native runners), plus
+cross-compile sanity checks for `aarch64-linux-gnu`, `aarch64-macos`,
+`x86_64-linux-gnu`, and `x86_64-macos` from the x86_64 host.
+
 Minimum Zig version: `0.16.0`.
 
 ## Install
