@@ -17,20 +17,34 @@ Reference: Cheshire & Baker, [Consistent Overhead Byte Stuffing][cobs-paper]
 
 ## Status
 
-`v1.1.0` — stable API. The public surface (`encode`, `decode`,
-`maxEncodedLength`, two error variants) is locked: breaking changes will
-be v2.0. **22 tests pass** (21 correctness/robustness + 1 fuzz harness),
-covering:
+`v1.2.0` — stable API + **line-coverage-measured**. The public surface
+(`encode`, `decode`, `maxEncodedLength`, two error variants) is locked:
+breaking changes will be v2.0.
+
+**Evidence vocabulary** (per the fleet's AGENT_HARNESS discipline):
+
+- `unit-tested` — 22 tests pass (21 correctness/robustness + 1 fuzz harness).
+- `fuzzed` — 117,000-trial bounded-input fuzz gated in CI; covers garbage-
+  decode never-panic + exhaustive single-bit-flip mutation.
+- `coverage-measured` — **100.00% line coverage on `src/root.zig`**
+  (48/48 lines, kcov against a dedicated coverage-driver executable that
+  exercises every public function and every error path; reproducible
+  via `bash tools/coverage.sh`).
+- `benchmarked` — `zig build bench` runs three p50/p95/p99 throughput
+  benches in ReleaseFast.
+- `hardware-verified` — Linux x86_64 + Linux aarch64 + macOS Apple Silicon
+  native runners on every push.
+
+Test surface covered:
 
 - Round-trip correctness across the size × content-pattern matrix (every documented edge case)
 - Encoded-form invariants (no `0x00` bytes in any encoded body, length ≤ `maxEncodedLength`)
 - 10,000-iteration random round-trip fuzz
 - 10,000-iteration garbage-decode never-panic robustness
 - Exhaustive single-bit-flip mutation of canonical encoded frames (decode either errors or returns — never crashes)
-- **v1.1 fuzz harness**: 117,000-trial bounded-input fuzz gated in CI
+- 117,000-trial bounded-input fuzz harness gated in CI
 
-Production-grade benchmarks shipped (`zig build bench`). Zero allocation,
-no third-party dependencies, freestanding-friendly.
+Zero allocation, no third-party dependencies, freestanding-friendly.
 
 CI covers Linux x86_64, Linux aarch64, and macOS arm64 (native runners), plus
 cross-compile sanity checks for `aarch64-linux-gnu`, `aarch64-macos`,
