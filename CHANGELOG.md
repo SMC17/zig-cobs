@@ -7,6 +7,28 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Honesty correction — 2026-05-15
+
+Prior `v1.0` / `v1.1` / "production-grade hygiene milestone" framing was
+a Type-I error class per the no-premature-production-claims doctrine:
+
+- **Zig itself is on 0.16, not 1.0.** No Zig library can credibly claim
+  API stability beyond "stable on Zig 0.16 today" until the language
+  itself ships 1.0. The v1.x git tags are honored for changelog
+  continuity, but every reader should treat this as **pre-1.0 in semver
+  spirit** until both that gate and a real-deployment gate close.
+- **Zero production deployment exists.** No real-traffic operation, no
+  soak time, no incident history. The hygiene work
+  (LICENSE / SECURITY / CONTRIBUTING / CI / CODE_OF_CONDUCT / dependabot
+  / CODEOWNERS) is real. The production claim it implied **wasn't
+  earned.**
+
+Going forward, the AGENT_HARNESS proof vocabulary (`scaffold` /
+`compiled` / `unit-tested` / `integration-tested` / `audited` /
+`benchmarked` / `hardware-verified`) is used strictly. See `STATUS.md`
+for the per-component proof index + the gates that would justify a
+stronger claim.
+
 ### Added
 
 - `tests/differential.zig` + `tests/c_ref/` — differential conformance harness cross-checking the Zig encoder/decoder against an independent C reference (written from Cheshire & Baker 1997/1999) plus the first five canonical paper test vectors from Table 1 of the IEEE/ACM ToN 1999 writeup. `zig build differential` runs 5 paper vectors + 10,000 random trials (mixed size buckets 0..4096) + 16 boundary sizes + 32 pure-pattern inputs; all 10,053 checks pass byte-identical in both encode and cross-decode directions on Linux x86_64 / Zig 0.16.0. Scope-honest: paper vectors 6–10 are intentionally omitted because the paper's tabulated encoded form drops the phantom-block trailer that every real implementation must emit — the rationale is documented in the test source.
