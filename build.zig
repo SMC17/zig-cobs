@@ -33,6 +33,32 @@ pub fn build(b: *std.Build) void {
     const example_step = b.step("example-roundtrip", "Run the roundtrip example");
     example_step.dependOn(&run_example.step);
 
+    // README Quickstart example — vendored verbatim from README.md as the
+    // executable form of the documentation. Backed by `tools/doctest.sh`
+    // which diff-checks the README block against this file; drift between
+    // README and code fails the doc-test.
+    const quickstart_mod = b.createModule(.{
+        .root_source_file = b.path("examples/quickstart.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    quickstart_mod.addImport("cobs", mod);
+    const quickstart_exe = b.addExecutable(.{
+        .name = "example-quickstart",
+        .root_module = quickstart_mod,
+    });
+    b.installArtifact(quickstart_exe);
+    const run_quickstart = b.addRunArtifact(quickstart_exe);
+    const quickstart_step = b.step("example-quickstart", "Run the README Quickstart example");
+    quickstart_step.dependOn(&run_quickstart.step);
+
+    // Doc-tests: extract the README's Quickstart block + diff against the
+    // vendored examples/quickstart.zig + run the binary + check output.
+    const doctest = b.addSystemCommand(&.{ "bash", "tools/doctest.sh" });
+    doctest.step.dependOn(b.getInstallStep());
+    const doctest_step = b.step("doctest", "Verify README code examples match the executable source + run cleanly");
+    doctest_step.dependOn(&doctest.step);
+
     // Fuzz harness — three-property check (round-trip, zero-freeness,
     // decoder-soundness on adversarial inputs). The full pass runs
     // 100K random + 12K boundary + 5K adversarial trials.
