@@ -109,6 +109,59 @@ fi
 assert_build_step "README documents 'zig build test'" "test"
 assert_build_step "README documents 'zig build bench'" "bench"
 
+# ─── Check 4: API signatures block matches the source ─────────────────────
+#
+# README has a ```zig fenced block with public-function declarations
+# (lines 86..95). Each signature line (excluding the `pub const Error`
+# block) MUST find a matching prefix in src/root.zig (where the same
+# `pub fn FOO(...)` line appears, just terminated with `{` not `;`).
+# Drift on a signature = test fails.
+API_BLOCK=$(mktemp)
+awk '
+  state == "scan" && /^```zig$/ { state = "in_block"; next }
+  state == "in_block" && /^pub fn / { gsub(/;$/, " {", $0); print; matched = 1; next }
+  state == "in_block" && matched && /^```$/ { state = "done"; exit }
+' README.md > "$API_BLOCK"
+
+if [ ! -s "$API_BLOCK" ]; then
+  # README has multiple ```zig blocks; the API one is the third. Try a more
+  # targeted extraction: find the block that contains `pub fn maxEncodedLength`
+  # but NOT `const std =` (which is the Quickstart).
+  awk '
+    /^```zig$/ { in_block = 1; lines = ""; sig_count = 0; has_main = 0; next }
+    /^```$/ {
+      if (in_block && sig_count >= 2 && !has_main) print lines
+      in_block = 0
+    }
+    in_block {
+      if (/^pub fn /) { sig_count++; gsub(/;$/, " {", $0); lines = lines $0 "\n" }
+      if (/const std = /) has_main = 1
+    }
+  ' README.md > "$API_BLOCK"
+fi
+
+api_miss=0
+api_total=0
+while IFS= read -r sig; do
+  [ -z "$sig" ] && continue
+  api_total=$((api_total + 1))
+  # Search src/root.zig for a line starting with the same prefix.
+  if ! grep -qF -- "$sig" src/root.zig; then
+    api_miss=$((api_miss + 1))
+    n_fail=$((n_fail + 1))
+    FAILURES+=("README API signature drift: $sig (not found in src/root.zig)")
+    echo "  FAIL  README API signature drift: $sig"
+  fi
+done < "$API_BLOCK"
+rm -f "$API_BLOCK"
+
+if [ "$api_miss" -eq 0 ] && [ "$api_total" -gt 0 ]; then
+  n_pass=$((n_pass + 1))
+  echo "  PASS  README API signatures ($api_total checked) all present in src/root.zig"
+elif [ "$api_total" -eq 0 ]; then
+  echo "  WARN  README API signature block not found (extractor failed)"
+fi
+
 echo
 echo "=== summary ==="
 echo "  pass: $n_pass"
