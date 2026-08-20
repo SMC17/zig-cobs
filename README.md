@@ -129,7 +129,7 @@ pub const Error = error{
 zig build test
 ```
 
-21 tests. Fuzz and property tests now cover round-trip across every documented
+22 tests (21 correctness/robustness + 1 fuzz-as-test). Fuzz and property tests now cover round-trip across every documented
 size × content-pattern corner plus 10k random adversarial payloads, and exercise
 the decoder against random bytes and single-bit-flipped frames to confirm it
 never panics.
