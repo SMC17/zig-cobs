@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "project": "zig-cobs",
+  "visibility": "private",
+  "systems": [
+    "Darwin",
+    "Linux"
+  ],
+  "required_files": [
+    "README.md",
+    "LICENSE"
+  ],
+  "task": "Encode and decode a byte frame using the README quickstart.",
+  "steps": [
+    {
+      "name": "unit suite",
+      "argv": [
+        "zig",
+        "build",
+        "test",
+        "-Doptimize=ReleaseSafe",
+        "--summary",
+        "all"
+      ],
+      "minimum_tests": 22
+    },
+    {
+      "name": "install fixture",
+      "argv": [
+        "zig",
+        "build",
+        "-Doptimize=ReleaseSafe"
+      ]
+    },
+    {
+      "name": "fixture task",
+      "argv": [
+        "zig",
+        "build",
+        "example-quickstart",
+        "-Doptimize=ReleaseSafe"
+      ]
+    },
+    {
+      "name": "README code agreement",
+      "argv": [
+        "zig",
+        "build",
+        "doctest",
+        "-Doptimize=ReleaseSafe"
+      ]
+    }
+  ],
+  "bundle_paths": [
+    "zig-out/bin/example-quickstart"
+  ],
+  "limitations": [
+    "Finite fixture acceptance; no new benchmark, coverage or hardware-parity claim.",
+    "Visibility is unchanged. Public release requires a deliberate source/history and license review.",
+    "Hosted Actions have not executed while the billing restriction remains."
+  ]
+}
