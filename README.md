@@ -230,3 +230,7 @@ This is one of a set of small, composable Zig libraries.
 - [**zig-h3**](https://github.com/SMC17/zig-h3) — H3 v4 spatial index, pure-Zig + libh3 wrapper
 
 See [github.com/SMC17](https://github.com/SMC17) for the full portfolio.
+
+## Unified C ABI, Python Wheel & WASM
+
+Core primitives from this repository are also cross-pollinated into **[SMC17/zinging (`zig-substrate`)](https://github.com/SMC17/zinging)** with C11 ABI bindings (`199` symbols), standalone Python wheels, JSON-RPC daemon (`substrate serve`), and `wasm32` builds.
